@@ -89,7 +89,20 @@ export function useMicRecorder(): UseMicRecorderReturn {
       try {
         setError(null)
 
-        const stream = await navigator.mediaDevices.getUserMedia({
+        if (typeof window === 'undefined') {
+          setError('Microphone is only available in the browser.')
+          return
+        }
+
+        const mediaDevices = navigator.mediaDevices
+        if (!mediaDevices?.getUserMedia) {
+          setError(
+            'Microphone is blocked: open the app at http://localhost:3000 (not a LAN IP like 10.x), or use HTTPS. Browsers only expose the mic in a secure context.'
+          )
+          return
+        }
+
+        const stream = await mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
             echoCancellation: true,
