@@ -1,11 +1,14 @@
 import { create } from 'zustand'
-import { Task, Assignment, MeetingSession, CodeReview } from '@/types'
+import { Task, Assignment, MeetingSession, CodeReview, Developer } from '@/types'
 
 interface CortexState {
   // Meeting
   currentSession: MeetingSession | null
   liveTranscript: string
   isRecording: boolean
+
+  // Developers
+  developers: Developer[]
 
   // Tasks
   tasks: Task[]
@@ -19,6 +22,8 @@ interface CortexState {
   error: string | null
 
   // Actions
+  setDevelopers: (devs: Developer[]) => void
+  addDeveloper: (dev: Developer) => void
   setLiveTranscript: (text: string) => void
   appendTranscript: (text: string) => void
   setIsRecording: (val: boolean) => void
@@ -36,11 +41,15 @@ export const useCortexStore = create<CortexState>((set, get) => ({
   currentSession: null,
   liveTranscript: '',
   isRecording: false,
+  developers: [],
   tasks: [],
   assignments: [],
   currentReview: null,
   isProcessing: false,
   error: null,
+
+  setDevelopers: (devs) => set({ developers: devs }),
+  addDeveloper: (dev) => set(state => ({ developers: [...state.developers, dev] })),
 
   setLiveTranscript: (text) => set({ liveTranscript: text }),
 

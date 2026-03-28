@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { reviewPullRequest } from '@/lib/reviewCode'
 import codebaseData from '@/data/codebase.json'
 import { getDeveloperById } from '@/lib/graph'
+import { getCodebase } from '@/lib/db'
 
 interface ModuleData {
   owner: string
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const codebase = codebaseData as Codebase
+    const codebase = await getCodebase() as Codebase
     const moduleData = codebase.modules[moduleName]
 
     if (!moduleData) {
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const owner = getDeveloperById(moduleData.owner)
+    const owner = await getDeveloperById(moduleData.owner)
     const pastDecisions = moduleData.decisions
 
     const review = await reviewPullRequest(

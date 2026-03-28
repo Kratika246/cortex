@@ -1,23 +1,25 @@
 import { Developer, Task, Assignment, GraphNode, GraphLink, TeamHealth } from '@/types'
 import { assignTaskToDeveloper } from './assignTask'
-import developersData from '@/data/developers.json'
+import { getDevelopers } from './db'
 
-export function getAllDevelopers(): Developer[] {
-  return developersData as Developer[]
+export async function getAllDevelopers(): Promise<Developer[]> {
+  return await getDevelopers()
 }
 
-export function getDeveloperById(id: string): Developer | undefined {
-  return (developersData as Developer[]).find(d => d.id === id)
+export async function getDeveloperById(id: string): Promise<Developer | undefined> {
+  const devs = await getAllDevelopers()
+  return devs.find(d => d.id === id)
 }
 
-export function getDeveloperByName(name: string): Developer | undefined {
-  return (developersData as Developer[]).find(d =>
+export async function getDeveloperByName(name: string): Promise<Developer | undefined> {
+  const devs = await getAllDevelopers()
+  return devs.find(d =>
     d.name.toLowerCase().includes(name.toLowerCase())
   )
 }
 
 export async function assignAllTasks(tasks: Task[]): Promise<Assignment[]> {
-  const devs = getAllDevelopers()
+  const devs = await getAllDevelopers()
   const assignments: Assignment[] = []
 
   for (const task of tasks) {
@@ -28,11 +30,11 @@ export async function assignAllTasks(tasks: Task[]): Promise<Assignment[]> {
   return assignments
 }
 
-export function buildGraphData(assignments: Assignment[]): {
+export async function buildGraphData(assignments: Assignment[]): Promise<{
   nodes: GraphNode[]
   links: GraphLink[]
-} {
-  const devs = getAllDevelopers()
+}> {
+  const devs = await getAllDevelopers()
 
   const workloadMap: Record<string, number> = {}
   assignments.forEach(a => {
@@ -97,15 +99,15 @@ function getNodeColor(primaryExpertise: string): string {
   return map[primaryExpertise] ?? '#6b7280'
 }
 
-export function getTeamHealthMetrics(assignments: Assignment[]): TeamHealth {
-  const devs = getAllDevelopers()
+export async function getTeamHealthMetrics(assignments: Assignment[]): Promise<TeamHealth> {
+  const devs = await getAllDevelopers()
 
   const workloadMap: Record<string, number> = {}
   assignments.forEach(a => {
     workloadMap[a.developer.id] = (workloadMap[a.developer.id] || 0) + 1
   })
 
-  const busiestDev = devs.reduce((prev, curr) =>
+  const busiestDev = devs.reduce((prev: Developer, curr: Developer) =>
     (workloadMap[curr.id] || 0) > (workloadMap[prev.id] || 0) ? curr : prev
   )
 
@@ -113,9 +115,9 @@ export function getTeamHealthMetrics(assignments: Assignment[]): TeamHealth {
     totalTasks: assignments.length,
     totalDevelopers: devs.length,
     averageWorkload:
-      assignments.length > 0
+      assignments.length > 0 && devs.length > 0
         ? (assignments.length / devs.length).toFixed(1)
         : '0.0',
-    busiestDeveloper: busiestDev.name,
+    busiestDeveloper: busiestDev?.name || 'N/A',
   }
 }

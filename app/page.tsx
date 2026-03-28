@@ -8,6 +8,8 @@ import type { Task, Assignment, CodeReview } from '@/types'
 export default function TestDashboard() {
   const {
     liveTranscript,
+    developers,
+    setDevelopers,
     tasks,
     setTasks,
     assignments,
@@ -23,10 +25,24 @@ export default function TestDashboard() {
   const [manualTranscript, setManualTranscript] = useState('')
   const [diff, setDiff] = useState('')
   const [moduleName, setModuleName] = useState('auth')
-  const [activeTab, setActiveTab] = useState<'meeting' | 'tasks' | 'review' | 'graph'>('meeting')
+  const [activeTab, setActiveTab] = useState<'meeting' | 'tasks' | 'review' | 'graph' | 'hr'>('meeting')
   const [logs, setLogs] = useState<string[]>([])
   /** When true, Start Recording asks to share a tab/window and mixes that audio with the mic (browser meetings + tab audio). */
   const [includeMeetingShareAudio, setIncludeMeetingShareAudio] = useState(false)
+
+  const fetchDevs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/developers')
+      const data = await res.json()
+      if (res.ok) setDevelopers(data.developers)
+    } catch (err) {
+      console.error('Fetch devs error:', err)
+    }
+  }, [setDevelopers])
+
+  useEffect(() => {
+    fetchDevs()
+  }, [fetchDevs])
 
   const log = (msg: string) => {
     setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 19)])
@@ -188,7 +204,7 @@ export default function TestDashboard() {
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 24 }}>
-            {(['meeting', 'tasks', 'review', 'graph'] as const).map(tab => (
+            {(['meeting', 'tasks', 'review', 'graph', 'hr'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -488,40 +504,85 @@ export default function TestDashboard() {
           {activeTab === 'graph' && (
             <Section title="07 — DEVELOPER KNOWLEDGE GRAPH (RAW DATA)">
               <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-                This shows the raw developer graph data. Full visualization comes in the real frontend.
+                This shows the developer graph data fetched directly from the database.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                {[
-                  { id: 'dev_001', name: 'Aryan Sharma', modules: ['auth', 'user-service'], workload: 4, color: '#3b82f6' },
-                  { id: 'dev_002', name: 'Priya Nair', modules: ['dashboard', 'onboarding'], workload: 6, color: '#8b5cf6' },
-                  { id: 'dev_003', name: 'Rahul Verma', modules: ['payments', 'billing'], workload: 7, color: '#06b6d4' },
-                  { id: 'dev_004', name: 'Sneha Kulkarni', modules: ['ml-pipeline', 'analytics'], workload: 5, color: '#10b981' },
-                  { id: 'dev_005', name: 'Karan Mehta', modules: ['infra', 'ci-cd'], workload: 3, color: '#f59e0b' },
-                  { id: 'dev_006', name: 'Aisha Khan', modules: ['notifications', 'realtime'], workload: 5, color: '#ef4444' },
-                ].map(dev => (
-                  <div key={dev.id} style={{
-                    background: '#111827',
-                    border: `1px solid ${dev.color}33`,
-                    borderTop: `3px solid ${dev.color}`,
-                    borderRadius: 8,
-                    padding: 12,
-                  }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px', color: dev.color }}>{dev.name}</p>
-                    <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 6px' }}>{dev.modules.join(', ')}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 10, color: '#475569' }}>WORKLOAD</span>
-                      <div style={{ flex: 1, height: 4, background: '#1e293b', borderRadius: 2 }}>
-                        <div style={{ width: `${dev.workload * 10}%`, height: '100%', background: dev.color, borderRadius: 2 }} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                {developers.length === 0 ? (
+                  <Empty text="No developers found in database." />
+                ) : (
+                  developers.map(dev => {
+                    const primaryExpertise = dev.expertise[0] || 'backend'
+                    const devColor = 
+                      primaryExpertise === 'backend' ? '#3b82f6' :
+                      primaryExpertise === 'frontend' ? '#8b5cf6' :
+                      primaryExpertise === 'machine learning' ? '#10b981' :
+                      primaryExpertise === 'DevOps' ? '#f59e0b' :
+                      primaryExpertise === 'real-time systems' ? '#ef4444' :
+                      primaryExpertise === 'payments' ? '#06b6d4' : '#6b7280'
+
+                    return (
+                      <div key={dev.id} style={{
+                        background: '#111827',
+                        border: `1px solid ${devColor}33`,
+                        borderTop: `3px solid ${devColor}`,
+                        borderRadius: 8,
+                        padding: 12,
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: devColor }}>{dev.name}</p>
+                          <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase' }}>{primaryExpertise}</span>
+                        </div>
+                        <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 8px', minHeight: '2.4em' }}>
+                          {dev.modules.join(', ')}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 10, color: '#475569' }}>WORKLOAD</span>
+                          <div style={{ flex: 1, height: 4, background: '#1e293b', borderRadius: 2 }}>
+                            <div style={{ width: `${Math.min(dev.workload * 10, 100)}%`, height: '100%', background: devColor, borderRadius: 2 }} />
+                          </div>
+                          <span style={{ fontSize: 10, color: '#64748b' }}>{dev.workload}/10</span>
+                        </div>
+                        {assignments.filter(a => a.developer.id === dev.id).length > 0 && (
+                          <p style={{ fontSize: 10, color: '#10b981', marginTop: 8, fontWeight: 600 }}>
+                            ● {assignments.filter(a => a.developer.id === dev.id).length} new tasks assigned
+                          </p>
+                        )}
                       </div>
-                      <span style={{ fontSize: 10, color: '#64748b' }}>{dev.workload}/10</span>
-                    </div>
-                    {assignments.filter(a => a.developer.id === dev.id).length > 0 && (
-                      <p style={{ fontSize: 10, color: '#10b981', marginTop: 6 }}>
-                        +{assignments.filter(a => a.developer.id === dev.id).length} new tasks
-                      </p>
-                    )}
-                  </div>
-                ))}
+                    )
+                  })
+                )}
+              </div>
+            </Section>
+          )}
+
+          {/* ── HR TAB ── */}
+          {activeTab === 'hr' && (
+            <Section title="08 — HR / DEVELOPER MANAGEMENT">
+              <div style={{ padding: '20px', textAlign: 'center', background: '#0a0f1e', borderRadius: 12, border: '1px solid #1e293b' }}>
+                <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '20px' }}>
+                  The HR Dashboard allows you to add new developers by their GitHub username. 
+                  Cortex will automatically fetch their profile and generate a skill set.
+                </p>
+                <a 
+                  href="/hr" 
+                  style={{ 
+                    display: 'inline-block',
+                    padding: '12px 24px',
+                    background: '#3b82f6',
+                    color: '#fff',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    letterSpacing: '1px',
+                    transition: 'transform 0.2s',
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                  onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  OPEN HR DASHBOARD →
+                </a>
               </div>
             </Section>
           )}
