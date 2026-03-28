@@ -2,9 +2,17 @@ import { useRef, useState, useCallback } from 'react'
 
 const TARGET_SAMPLE_RATE = 16000
 
+export interface StartRecordingOptions {
+  /** Capture the shared tab/window/monitor (meeting app) and mix with the mic. User must allow "Share audio" where offered. */
+  includeDisplayAudio?: boolean
+}
+
 interface UseMicRecorderReturn {
   isRecording: boolean
-  startRecording: (onChunk: (chunk: ArrayBuffer) => void) => Promise<void>
+  startRecording: (
+    onChunk: (chunk: ArrayBuffer) => void,
+    options?: StartRecordingOptions
+  ) => Promise<void>
   stopRecording: () => void
   error: string | null
 }
@@ -41,13 +49,19 @@ function floatTo16BitLE(float32: Float32Array): ArrayBuffer {
 export function useMicRecorder(): UseMicRecorderReturn {
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const displayStreamRef = useRef<MediaStream | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const displaySourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const gainRef = useRef<GainNode | null>(null)
+  const displayEndedCleanupRef = useRef<(() => void) | null>(null)
 
   const stopRecording = useCallback(() => {
+    displayEndedCleanupRef.current?.()
+    displayEndedCleanupRef.current = null
+
     if (processorRef.current) {
       try {
         processorRef.current.disconnect()
@@ -57,13 +71,21 @@ export function useMicRecorder(): UseMicRecorderReturn {
       processorRef.current.onaudioprocess = null
       processorRef.current = null
     }
-    if (sourceRef.current) {
+    if (micSourceRef.current) {
       try {
-        sourceRef.current.disconnect()
+        micSourceRef.current.disconnect()
       } catch {
         /* ignore */
       }
-      sourceRef.current = null
+      micSourceRef.current = null
+    }
+    if (displaySourceRef.current) {
+      try {
+        displaySourceRef.current.disconnect()
+      } catch {
+        /* ignore */
+      }
+      displaySourceRef.current = null
     }
     if (gainRef.current) {
       try {
@@ -77,17 +99,25 @@ export function useMicRecorder(): UseMicRecorderReturn {
       void audioContextRef.current.close()
       audioContextRef.current = null
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop())
+      micStreamRef.current = null
+    }
+    if (displayStreamRef.current) {
+      displayStreamRef.current.getTracks().forEach(t => t.stop())
+      displayStreamRef.current = null
     }
     setIsRecording(false)
   }, [])
 
   const startRecording = useCallback(
-    async (onChunk: (chunk: ArrayBuffer) => void) => {
+    async (
+      onChunk: (chunk: ArrayBuffer) => void,
+      options?: StartRecordingOptions
+    ) => {
       try {
         setError(null)
+        const includeDisplayAudio = options?.includeDisplayAudio === true
 
         if (typeof window === 'undefined') {
           setError('Microphone is only available in the browser.')
@@ -102,15 +132,55 @@ export function useMicRecorder(): UseMicRecorderReturn {
           return
         }
 
-        const stream = await mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-        })
+        if (includeDisplayAudio && !mediaDevices.getDisplayMedia) {
+          setError('This browser does not support sharing tab/window audio.')
+          return
+        }
 
-        streamRef.current = stream
+        let displayStream: MediaStream | null = null
+        if (includeDisplayAudio) {
+          try {
+            displayStream = await mediaDevices.getDisplayMedia({
+              video: true,
+              audio: true,
+            })
+          } catch (err) {
+            if (err instanceof Error && err.name === 'NotAllowedError') {
+              setError('Screen/tab share was cancelled or denied.')
+            } else if (err instanceof Error) {
+              setError(err.message)
+            }
+            return
+          }
+
+          const hasAudio = displayStream.getAudioTracks().length > 0
+          if (!hasAudio) {
+            displayStream.getTracks().forEach(t => t.stop())
+            setError(
+              'No audio in the capture. When sharing, choose a browser tab with your meeting and turn ON “Share tab audio”. On Windows, “Entire screen” can include system audio.'
+            )
+            return
+          }
+
+          displayStreamRef.current = displayStream
+        }
+
+        let micStream: MediaStream
+        try {
+          micStream = await mediaDevices.getUserMedia({
+            audio: {
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          })
+        } catch (err) {
+          if (displayStream) displayStream.getTracks().forEach(t => t.stop())
+          displayStreamRef.current = null
+          throw err
+        }
+
+        micStreamRef.current = micStream
 
         const Ctx =
           window.AudioContext ||
@@ -127,8 +197,30 @@ export function useMicRecorder(): UseMicRecorderReturn {
         }
 
         const sourceRate = audioContext.sampleRate
-        const source = audioContext.createMediaStreamSource(stream)
-        sourceRef.current = source
+
+        const micSource = audioContext.createMediaStreamSource(micStream)
+        micSourceRef.current = micSource
+
+        const mixer = audioContext.createGain()
+        mixer.gain.value = 1.0
+
+        micSource.connect(mixer)
+
+        if (displayStream && displayStream.getAudioTracks().length > 0) {
+          const displaySource =
+            audioContext.createMediaStreamSource(displayStream)
+          displaySourceRef.current = displaySource
+          displaySource.connect(mixer)
+
+          const onShareEnded = () => stopRecording()
+          const videoTracks = displayStream.getVideoTracks()
+          videoTracks.forEach(t => t.addEventListener('ended', onShareEnded))
+          displayEndedCleanupRef.current = () => {
+            videoTracks.forEach(t =>
+              t.removeEventListener('ended', onShareEnded)
+            )
+          }
+        }
 
         const bufferSize = 4096
         const processor = audioContext.createScriptProcessor(bufferSize, 1, 1)
@@ -148,7 +240,7 @@ export function useMicRecorder(): UseMicRecorderReturn {
         gain.gain.value = 0
         gainRef.current = gain
 
-        source.connect(processor)
+        mixer.connect(processor)
         processor.connect(gain)
         gain.connect(audioContext.destination)
 

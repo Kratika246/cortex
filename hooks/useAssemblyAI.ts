@@ -25,7 +25,9 @@ function buildOrderedTranscript(turns: Record<number, string>): string {
 }
 
 export function useAssemblyAI(
-  onAutoExtract?: (transcript: string) => void
+  onAutoExtract?: (transcript: string) => void,
+  /** Mix in tab/window audio from getDisplayMedia (meeting in browser or shared desktop). */
+  includeDisplayAudio = false
 ): UseAssemblyAIReturn {
   const wsRef = useRef<WebSocket | null>(null)
   const autoExtractTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -127,19 +129,28 @@ export function useAssemblyAI(
         }, AUTO_EXTRACT_INTERVAL)
       }
 
-      // Start mic and stream chunks to AssemblyAI
-      await startRecording((chunk: ArrayBuffer) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(chunk)
-        }
-      })
+      await startRecording(
+        (chunk: ArrayBuffer) => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(chunk)
+          }
+        },
+        { includeDisplayAudio }
+      )
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Transcription failed to start'
       setError(message)
       console.error('Start transcription error:', err)
     }
-  }, [connectWebSocket, startRecording, startSession, setError, onAutoExtract])
+  }, [
+    connectWebSocket,
+    startRecording,
+    startSession,
+    setError,
+    onAutoExtract,
+    includeDisplayAudio,
+  ])
 
   const stopTranscription = useCallback(() => {
     // Stop mic

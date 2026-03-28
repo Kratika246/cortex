@@ -25,6 +25,8 @@ export default function TestDashboard() {
   const [moduleName, setModuleName] = useState('auth')
   const [activeTab, setActiveTab] = useState<'meeting' | 'tasks' | 'review' | 'graph'>('meeting')
   const [logs, setLogs] = useState<string[]>([])
+  /** When true, Start Recording asks to share a tab/window and mixes that audio with the mic (browser meetings + tab audio). */
+  const [includeMeetingShareAudio, setIncludeMeetingShareAudio] = useState(false)
 
   const log = (msg: string) => {
     setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 19)])
@@ -36,8 +38,10 @@ export default function TestDashboard() {
     await extractTasks(transcript)
   }, [])
 
-  const { startTranscription, stopTranscription, isRecording } =
-    useAssemblyAI(handleAutoExtract)
+  const { startTranscription, stopTranscription, isRecording } = useAssemblyAI(
+    handleAutoExtract,
+    includeMeetingShareAudio
+  )
 
   const transcriptForExtract = isRecording ? liveTranscript : manualTranscript
 
@@ -213,6 +217,29 @@ export default function TestDashboard() {
 
               {/* Live Recording */}
               <Section title="01 — LIVE RECORDING">
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 12,
+                    color: '#94a3b8',
+                    marginBottom: 10,
+                    cursor: isRecording ? 'default' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeMeetingShareAudio}
+                    disabled={isRecording}
+                    onChange={e => setIncludeMeetingShareAudio(e.target.checked)}
+                  />
+                  Also capture meeting / tab audio (share the Meet, Zoom in browser, or screen with audio — then allow the mic)
+                </label>
+                <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 12px', lineHeight: 1.5 }}>
+                  Web: share the <strong style={{ color: '#94a3b8' }}>tab</strong> that has the call and enable <strong style={{ color: '#94a3b8' }}>Share tab audio</strong>.
+                  Desktop apps on Windows: try sharing <strong style={{ color: '#94a3b8' }}>Entire screen</strong> with system audio. Mac: often need a virtual audio device for system sound.
+                </p>
                 <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
                   <button onClick={testToken} style={btnStyle('#1e293b', '#94a3b8')}>
                     Test AssemblyAI Token
