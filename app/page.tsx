@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAssemblyAI } from '@/hooks/useAssemblyAI'
 import { useCortexStore } from '@/store/cortexStore'
 import type { Task, Assignment, CodeReview } from '@/types'
@@ -36,7 +36,18 @@ export default function TestDashboard() {
     await extractTasks(transcript)
   }, [])
 
-  const { startTranscription, stopTranscription, isRecording } = useAssemblyAI(handleAutoExtract)
+  const { startTranscription, stopTranscription, isRecording } =
+    useAssemblyAI(handleAutoExtract)
+
+  const transcriptForExtract = isRecording ? liveTranscript : manualTranscript
+
+  const wasRecordingRef = useRef(false)
+  useEffect(() => {
+    if (wasRecordingRef.current && !isRecording) {
+      setManualTranscript(useCortexStore.getState().liveTranscript)
+    }
+    wasRecordingRef.current = isRecording
+  }, [isRecording])
 
   // ── Extract Tasks ──
   const extractTasks = async (transcript: string) => {
@@ -243,10 +254,13 @@ export default function TestDashboard() {
               </Section>
 
               {/* Manual Input */}
-              <Section title="02 — MANUAL TRANSCRIPT (for testing without mic)">
+              <Section title="02 — MANUAL TRANSCRIPT (live while recording, or paste)">
                 <textarea
-                  value={manualTranscript}
-                  onChange={e => setManualTranscript(e.target.value)}
+                  value={isRecording ? liveTranscript : manualTranscript}
+                  onChange={e => {
+                    if (!isRecording) setManualTranscript(e.target.value)
+                  }}
+                  readOnly={isRecording}
                   placeholder="Paste a meeting transcript here to test extraction..."
                   style={{
                     width: '100%',
@@ -260,6 +274,7 @@ export default function TestDashboard() {
                     minHeight: 120,
                     resize: 'vertical',
                     outline: 'none',
+                    opacity: isRecording ? 0.95 : 1,
                   }}
                 />
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -270,8 +285,8 @@ export default function TestDashboard() {
                     Load Sample
                   </button>
                   <button
-                    onClick={() => extractTasks(manualTranscript)}
-                    disabled={isProcessing || !manualTranscript.trim()}
+                    onClick={() => extractTasks(transcriptForExtract)}
+                    disabled={isProcessing || !transcriptForExtract.trim()}
                     style={btnStyle('#3b82f6', '#fff')}
                   >
                     {isProcessing ? 'Extracting...' : 'Extract Tasks →'}

@@ -2,8 +2,10 @@ import { useRef, useCallback, useEffect } from 'react'
 import { useCortexStore } from '@/store/cortexStore'
 import { useMicRecorder } from './useMicRecorder'
 
-const ASSEMBLYAI_WS_URL = 'wss://api.assemblyai.com/v2/realtime/ws'
+const ASSEMBLYAI_WS_BASE = 'wss://streaming.assemblyai.com/v3/ws'
 const SAMPLE_RATE = 16000
+/** Required on v3; see https://www.assemblyai.com/docs/streaming/select-the-speech-model */
+const SPEECH_MODEL = 'u3-rt-pro'
 const AUTO_EXTRACT_INTERVAL = 60000 // 60 seconds
 
 interface UseAssemblyAIReturn {
@@ -13,20 +15,25 @@ interface UseAssemblyAIReturn {
   error: string | null
 }
 
+function buildOrderedTranscript(turns: Record<number, string>): string {
+  return Object.keys(turns)
+    .sort((a, b) => Number(a) - Number(b))
+    .map(k => turns[Number(k)])
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+}
+
 export function useAssemblyAI(
   onAutoExtract?: (transcript: string) => void
 ): UseAssemblyAIReturn {
   const wsRef = useRef<WebSocket | null>(null)
   const autoExtractTimerRef = useRef<NodeJS.Timeout | null>(null)
+  /** v3 Turn messages are keyed by turn_order; partials update the same slot. */
+  const turnsRef = useRef<Record<number, string>>({})
 
-  const {
-    appendTranscript,
-    liveTranscript,
-    startSession,
-    endSession,
-    setError,
-    error,
-  } = useCortexStore()
+  const { setLiveTranscript, startSession, endSession, setError, error } =
+    useCortexStore()
 
   const { isRecording, startRecording, stopRecording, error: micError } =
     useMicRecorder()
@@ -46,9 +53,13 @@ export function useAssemblyAI(
   const connectWebSocket = useCallback(
     async (token: string): Promise<WebSocket> => {
       return new Promise((resolve, reject) => {
-        const ws = new WebSocket(
-          `${ASSEMBLYAI_WS_URL}?sample_rate=${SAMPLE_RATE}&token=${token}`
-        )
+        const qs = new URLSearchParams({
+          speech_model: SPEECH_MODEL,
+          sample_rate: String(SAMPLE_RATE),
+          token,
+          formatted_finals: 'true',
+        })
+        const ws = new WebSocket(`${ASSEMBLYAI_WS_BASE}?${qs}`)
 
         ws.onopen = () => {
           console.log('AssemblyAI WebSocket connected')
@@ -60,17 +71,28 @@ export function useAssemblyAI(
         }
 
         ws.onmessage = (event) => {
+          if (typeof event.data !== 'string') return
           try {
             const message = JSON.parse(event.data)
 
-            // message_type: FinalTranscript = confirmed sentence
-            // message_type: PartialTranscript = still speaking
-            if (
-              message.message_type === 'FinalTranscript' &&
-              message.text &&
-              message.text.trim() !== ''
-            ) {
-              appendTranscript(message.text)
+            if (message.type === 'Error') {
+              const detail =
+                message.error ??
+                message.message ??
+                JSON.stringify(message)
+              console.error('AssemblyAI streaming error:', detail)
+              setError(String(detail))
+              return
+            }
+
+            if (message.type === 'Turn') {
+              const text = `${message.transcript ?? message.utterance ?? ''}`
+              const order =
+                typeof message.turn_order === 'number' ? message.turn_order : 0
+              turnsRef.current[order] = text
+              setLiveTranscript(
+                buildOrderedTranscript(turnsRef.current)
+              )
             }
           } catch {
             console.error('Failed to parse AssemblyAI message:', event.data)
@@ -82,13 +104,14 @@ export function useAssemblyAI(
         }
       })
     },
-    [appendTranscript]
+    [setLiveTranscript, setError]
   )
 
   const startTranscription = useCallback(async () => {
     try {
       setError(null)
       startSession()
+      turnsRef.current = {}
 
       const token = await getToken()
       const ws = await connectWebSocket(token)
@@ -131,7 +154,7 @@ export function useAssemblyAI(
     // Send terminate message to AssemblyAI then close
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ terminate_session: true }))
+        wsRef.current.send(JSON.stringify({ type: 'Terminate' }))
       }
       wsRef.current.close()
       wsRef.current = null
