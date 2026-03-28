@@ -1,0 +1,62 @@
+{
+  "modules": {
+    "auth": {
+      "owner": "dev_001",
+      "files": ["auth/login.ts", "auth/jwt.ts", "auth/middleware.ts"],
+      "decisions": [
+        "Use bcrypt with salt rounds 12 for password hashing",
+        "JWT refresh tokens expire in 7 days",
+        "Never store tokens in localStorage, use httpOnly cookies"
+      ]
+    },
+    "user-service": {
+      "owner": "dev_001",
+      "files": ["users/controller.ts", "users/model.ts"],
+      "decisions": [
+        "Soft delete users, never hard delete",
+        "User roles: admin, developer, viewer"
+      ]
+    },
+    "dashboard": {
+      "owner": "dev_002",
+      "files": ["app/dashboard/page.tsx", "components/charts/"],
+      "decisions": [
+        "Use react-force-graph for all graph visualizations",
+        "Dashboard must load under 2 seconds on mobile"
+      ]
+    },
+    "payments": {
+      "owner": "dev_003",
+      "files": ["payments/razorpay.ts", "payments/webhook.ts"],
+      "decisions": [
+        "Always verify Razorpay webhook signature before processing",
+        "Avoid mutex for shared state, use message queues instead",
+        "Log every payment event for audit trail"
+      ]
+    },
+    "ml-pipeline": {
+      "owner": "dev_004",
+      "files": ["ml/pipeline.py", "ml/train.py"],
+      "decisions": [
+        "All models versioned with MLflow",
+        "Retrain threshold is 5% accuracy drop"
+      ]
+    },
+    "infra": {
+      "owner": "dev_005",
+      "files": [".github/workflows/", "docker-compose.yml"],
+      "decisions": [
+        "All services must have health check endpoints",
+        "Use Kubernetes rolling updates, never recreate"
+      ]
+    },
+    "notifications": {
+      "owner": "dev_006",
+      "files": ["notifications/email.ts", "notifications/ws.ts"],
+      "decisions": [
+        "All new APIs must follow GraphQL schema conventions",
+        "WebSocket connections must reconnect automatically on drop"
+      ]
+    }
+  }
+}

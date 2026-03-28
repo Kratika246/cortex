@@ -1,0 +1,5 @@
+{
+  "id": "meeting_001",
+  "title": "Sprint Planning — Week 12",
+  "content": "Aryan, we need you to fix the JWT refresh token bug that's been causing logouts. Rahul, the Razorpay webhook is failing for international cards, please investigate that by Thursday. Sneha, can you retrain the recommendation model with the new user data we collected last week? Priya, the dashboard is slow on mobile, we need a performance audit. Karan, set up staging environment on Kubernetes before the release. Aisha, users are not getting email notifications on password reset, fix that today. Also team decision — we are moving all new APIs to GraphQL starting next sprint. No more REST for internal services."
+}

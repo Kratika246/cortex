@@ -1,0 +1,86 @@
+[
+  {
+    "id": "dev_001",
+    "name": "Aryan Sharma",
+    "email": "aryan@cortex.dev",
+    "languages": ["TypeScript", "Node.js", "Python"],
+    "modules": ["auth", "user-service", "api-gateway"],
+    "workload": 4,
+    "expertise": ["backend", "security", "REST APIs"],
+    "pastTasks": [
+      "Fixed JWT expiry bug",
+      "Built OAuth2 flow",
+      "Refactored user middleware"
+    ]
+  },
+  {
+    "id": "dev_002",
+    "name": "Priya Nair",
+    "email": "priya@cortex.dev",
+    "languages": ["TypeScript", "React", "Next.js"],
+    "modules": ["dashboard", "onboarding", "design-system"],
+    "workload": 6,
+    "expertise": ["frontend", "UI/UX", "performance"],
+    "pastTasks": [
+      "Built graph visualization",
+      "Redesigned onboarding flow",
+      "Fixed CLS issues"
+    ]
+  },
+  {
+    "id": "dev_003",
+    "name": "Rahul Verma",
+    "email": "rahul@cortex.dev",
+    "languages": ["Python", "TypeScript", "SQL"],
+    "modules": ["payments", "billing", "webhooks"],
+    "workload": 7,
+    "expertise": ["payments", "backend", "databases"],
+    "pastTasks": [
+      "Integrated Razorpay",
+      "Built webhook retry system",
+      "Optimized billing queries"
+    ]
+  },
+  {
+    "id": "dev_004",
+    "name": "Sneha Kulkarni",
+    "email": "sneha@cortex.dev",
+    "languages": ["Python", "TypeScript", "TensorFlow"],
+    "modules": ["ml-pipeline", "recommendations", "analytics"],
+    "workload": 5,
+    "expertise": ["machine learning", "data pipelines", "NLP"],
+    "pastTasks": [
+      "Built task classifier",
+      "Trained recommendation model",
+      "Set up MLflow tracking"
+    ]
+  },
+  {
+    "id": "dev_005",
+    "name": "Karan Mehta",
+    "email": "karan@cortex.dev",
+    "languages": ["TypeScript", "Go", "Docker"],
+    "modules": ["infra", "ci-cd", "monitoring"],
+    "workload": 3,
+    "expertise": ["DevOps", "infrastructure", "Kubernetes"],
+    "pastTasks": [
+      "Set up GitHub Actions",
+      "Configured Prometheus",
+      "Dockerized all services"
+    ]
+  },
+  {
+    "id": "dev_006",
+    "name": "Aisha Khan",
+    "email": "aisha@cortex.dev",
+    "languages": ["TypeScript", "Node.js", "GraphQL"],
+    "modules": ["notifications", "email-service", "realtime"],
+    "workload": 5,
+    "expertise": ["real-time systems", "GraphQL", "websockets"],
+    "pastTasks": [
+      "Built websocket server",
+      "Integrated SendGrid",
+      "Built GraphQL subscriptions"
+    ]
+  }
+]
