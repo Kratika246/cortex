@@ -7,14 +7,24 @@ import { useCortexStore } from '@/store/cortexStore'
 interface MeetingStatusProps {
   onAutoExtract?: (transcript: string) => void
   onManualExtract?: (transcript: string) => void
+  onUploadToJira?: () => void
+  isSyncingJira?: boolean
 }
 
-export function MeetingStatus({ onAutoExtract, onManualExtract }: MeetingStatusProps) {
+export function MeetingStatus({ 
+  onAutoExtract, 
+  onManualExtract, 
+  onUploadToJira,
+  isSyncingJira 
+}: MeetingStatusProps) {
   const {
     liveTranscript,
     isProcessing,
     error,
     setError,
+    aiResponse,
+    isAiThinking,
+    setAiResponse,
   } = useCortexStore()
 
   const [includeMeetingShareAudio, setIncludeMeetingShareAudio] = useState(false)
@@ -113,6 +123,15 @@ export function MeetingStatus({ onAutoExtract, onManualExtract }: MeetingStatusP
               Extract Now
             </button>
           )}
+          {onUploadToJira && (
+            <button
+              onClick={onUploadToJira}
+              disabled={isSyncingJira || isProcessing}
+              style={btnStyle('#9333ea', '#fff')}
+            >
+              {isSyncingJira ? 'Uploading...' : 'Upload to Jira'}
+            </button>
+          )}
         </div>
 
         {isRecording && (
@@ -134,6 +153,27 @@ export function MeetingStatus({ onAutoExtract, onManualExtract }: MeetingStatusP
         }}>
           {liveTranscript || <span style={{ color: '#334155' }}>Live transcript will appear here...</span>}
         </div>
+
+        {/* AI Response Section */}
+        {(isAiThinking || aiResponse) && (
+          <div style={{ 
+            marginTop: 16, 
+            padding: 16, 
+            background: '#0f172a', 
+            border: '1px solid #3b82f6', 
+            borderRadius: 8,
+            boxShadow: '0 0 15px rgba(59, 130, 246, 0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h4 style={{ fontSize: 11, color: '#3b82f6', fontWeight: 800, letterSpacing: 1 }}>CORTEX AI RESPONSE</h4>
+              {isAiThinking && <span style={{ fontSize: 10, color: '#3b82f6', fontStyle: 'italic' }}>Thinking...</span>}
+              {!isAiThinking && <button onClick={() => setAiResponse(null)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 14, cursor: 'pointer' }}>×</button>}
+            </div>
+            <p style={{ fontSize: 13, color: '#e2e8f0', margin: 0, lineHeight: 1.5 }}>
+              {isAiThinking ? 'Processing your request...' : aiResponse}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Manual Input */}

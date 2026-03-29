@@ -85,7 +85,7 @@ export default function HRDashboard() {
 
   return (
     <PageWrapper>
-      <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ padding: '0', maxWidth: '1200px', margin: '0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '2px', color: '#3b82f6' }}>
             HR — DEVELOPER MANAGEMENT

@@ -70,3 +70,27 @@ export interface TeamHealth {
   averageWorkload: string
   busiestDeveloper: string
 }
+
+export interface JiraIssue {
+  id: string
+  key: string
+  summary: string
+  description: string
+  status: string
+  priority: string
+  assignee?: string
+}
+
+export interface LinearIssue {
+  id: string
+  title: string
+  status: { name: string }
+  priority: number
+  assignee?: { name: string }
+}
+
+export interface TestRailCase {
+  id: number
+  title: string
+  priority_id: number
+}

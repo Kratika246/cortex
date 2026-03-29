@@ -17,6 +17,10 @@ interface CortexState {
   // Review
   currentReview: CodeReview | null
 
+  // Chatbot
+  aiResponse: string | null
+  isAiThinking: boolean
+
   // UI
   isProcessing: boolean
   error: string | null
@@ -30,6 +34,8 @@ interface CortexState {
   setTasks: (tasks: Task[]) => void
   setAssignments: (assignments: Assignment[]) => void
   setCurrentReview: (review: CodeReview | null) => void
+  setAiResponse: (res: string | null) => void
+  setIsAiThinking: (val: boolean) => void
   setIsProcessing: (val: boolean) => void
   setError: (error: string | null) => void
   startSession: () => void
@@ -45,6 +51,8 @@ export const useCortexStore = create<CortexState>((set, get) => ({
   tasks: [],
   assignments: [],
   currentReview: null,
+  aiResponse: null,
+  isAiThinking: false,
   isProcessing: false,
   error: null,
 
@@ -67,6 +75,10 @@ export const useCortexStore = create<CortexState>((set, get) => ({
   setAssignments: (assignments) => set({ assignments }),
 
   setCurrentReview: (review) => set({ currentReview: review }),
+
+  setAiResponse: (res) => set({ aiResponse: res }),
+
+  setIsAiThinking: (val) => set({ isAiThinking: val }),
 
   setIsProcessing: (val) => set({ isProcessing: val }),
 

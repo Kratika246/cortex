@@ -34,11 +34,52 @@ export function useAssemblyAI(
   /** v3 Turn messages are keyed by turn_order; partials update the same slot. */
   const turnsRef = useRef<Record<number, string>>({})
 
-  const { setLiveTranscript, startSession, endSession, setError, error } =
+  const { setLiveTranscript, appendTranscript, startSession, endSession, setError, error, setAiResponse, setIsAiThinking } =
     useCortexStore()
 
   const { isRecording, startRecording, stopRecording, error: micError } =
     useMicRecorder()
+
+  // Track the most recent partial to append to the finalized turns
+  const currentPartialRef = useRef<string>('')
+
+  const updateUI = useCallback(() => {
+    const finalized = buildOrderedTranscript(turnsRef.current)
+    const partial = currentPartialRef.current
+    const fullDisplay = partial 
+      ? (finalized ? `${finalized} ${partial}` : partial)
+      : finalized
+    
+    setLiveTranscript(fullDisplay)
+  }, [setLiveTranscript])
+
+  const speak = (text: string) => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'en-US'
+      window.speechSynthesis.speak(utterance)
+    }
+  }
+
+  const handleChatbotCommand = async (command: string, transcript: string) => {
+    try {
+      setIsAiThinking(true)
+      const res = await fetch('/api/chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command, transcript }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAiResponse(data.response)
+        speak(data.response)
+      }
+    } catch (err) {
+      console.error('Chatbot command failed:', err)
+    } finally {
+      setIsAiThinking(false)
+    }
+  }
 
   // Propagate mic errors to store
   useEffect(() => {
@@ -47,7 +88,10 @@ export function useAssemblyAI(
 
   const getToken = async (): Promise<string> => {
     const res = await fetch('/api/assemblyai-token')
-    if (!res.ok) throw new Error('Failed to get AssemblyAI token')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || `Failed to get token: ${res.status}`)
+    }
     const data = await res.json()
     return data.token
   }
@@ -76,8 +120,13 @@ export function useAssemblyAI(
           if (typeof event.data !== 'string') return
           try {
             const message = JSON.parse(event.data)
+            
+            // Log message types for debugging if needed
+            if (message.message_type !== 'SessionBegins' && message.type !== 'SessionBegins') {
+              console.log('[AssemblyAI Message]', message.message_type || message.type, message.text || message.transcript || '')
+            }
 
-            if (message.type === 'Error') {
+            if (message.type === 'Error' || message.message_type === 'Error') {
               const detail =
                 message.error ??
                 message.message ??
@@ -87,17 +136,64 @@ export function useAssemblyAI(
               return
             }
 
-            if (message.type === 'Turn') {
+            // Handle Transcripts (v3 typical messages)
+            if (message.message_type === 'FinalTranscript' || message.message_type === 'PartialTranscript') {
+              const text = message.text || ''
+              
+              if (message.message_type === 'PartialTranscript') {
+                currentPartialRef.current = text
+                updateUI()
+              } else {
+                // FinalTranscript
+                currentPartialRef.current = ''
+                // If it's a FinalTranscript but we aren't using Turns for this model
+                // we should probably append it to a default turn (e.g. order 0) or handle it
+                // But for u3-rt-pro, Turn messages usually follow. 
+                // Let's rely on Turn messages if they exist, otherwise use Final.
+                if (message.type !== 'Turn') {
+                   // Fallback: append if not handled by Turn
+                   // To avoid doubling, we skip this if the model is u3-rt-pro which uses Turns
+                   if (SPEECH_MODEL !== 'u3-rt-pro') {
+                     appendTranscript(text)
+                   }
+                }
+              }
+
+              // Check for trigger word "hey cortex"
+              const lowerText = text.toLowerCase()
+              if (lowerText.includes('hey cortex') || lowerText.includes('hey, cortex')) {
+                const parts = lowerText.split(/hey,? cortex/i)
+                const command = parts[parts.length - 1].trim()
+                if (command.length > 3) {
+                  // Use the accumulated transcript for context
+                  handleChatbotCommand(command, useCortexStore.getState().liveTranscript)
+                }
+              }
+              return
+            }
+
+            // Handle Turn messages (v3 universal streaming specific)
+            if (message.type === 'Turn' || message.message_type === 'Turn') {
               const text = `${message.transcript ?? message.utterance ?? ''}`
               const order =
                 typeof message.turn_order === 'number' ? message.turn_order : 0
               turnsRef.current[order] = text
-              setLiveTranscript(
-                buildOrderedTranscript(turnsRef.current)
-              )
+              currentPartialRef.current = '' // Clear partial when a turn arrives
+              updateUI()
+
+              // Check for trigger word "hey cortex"
+              const lowerText = text.toLowerCase()
+              if (lowerText.includes('hey cortex') || lowerText.includes('hey, cortex')) {
+                const parts = lowerText.split(/hey,? cortex/i)
+                const command = parts[parts.length - 1].trim()
+                if (command.length > 3) {
+                  const finalized = buildOrderedTranscript(turnsRef.current)
+                  handleChatbotCommand(command, finalized)
+                }
+              }
             }
-          } catch {
-            console.error('Failed to parse AssemblyAI message:', event.data)
+          } catch (err) {
+            console.error('Failed to parse AssemblyAI message:', event.data, err)
           }
         }
 
@@ -106,7 +202,7 @@ export function useAssemblyAI(
         }
       })
     },
-    [setLiveTranscript, setError]
+    [setLiveTranscript, appendTranscript, setError, handleChatbotCommand, updateUI]
   )
 
   const startTranscription = useCallback(async () => {
