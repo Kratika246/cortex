@@ -1,7 +1,5 @@
 # Plan: Connect Cortex to External Project Management Tools (Jira, Linear, TestRail)
 
-I will implement a fully automated synchronization system that pushes AI-extracted tasks, meeting transcripts, and assignments directly to external tools like Jira, Linear, and TestRail.
-
 ## Summary
 The goal is to create a bridge between Cortex's AI intelligence and industry-standard project management tools. When tasks are extracted from a meeting transcript, they will be automatically created as issues/tickets in Jira or Linear, and relevant test-related tasks will be pushed to TestRail.
 
